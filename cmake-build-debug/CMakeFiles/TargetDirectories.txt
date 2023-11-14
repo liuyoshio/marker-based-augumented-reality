@@ -1,0 +1,3 @@
+/Users/yoshio/Desktop/watanabe-lab/marker-based-augumented-reality/cmake-build-debug/CMakeFiles/project.dir
+/Users/yoshio/Desktop/watanabe-lab/marker-based-augumented-reality/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/yoshio/Desktop/watanabe-lab/marker-based-augumented-reality/cmake-build-debug/CMakeFiles/rebuild_cache.dir

@@ -24,7 +24,7 @@ static cv::Mat cameraMatrix = (cv::Mat_<double>(3, 3) << 1.66917519e+03, 0.0, 9.
                                                     0.0, 1.66758795e+03, 6.37204097e+02,
                                                     0.0, 0.0, 1.0);
 static cv::Mat distCoeffs = (cv::Mat_<double>(1, 5) << -5.84632887e-02, 7.84458638e-01, -9.94221022e-04, -1.60610409e-04, -3.35437898e+00);
-
+static const float markerLength = 0.05;
 // Our vertices. Tree consecutive floats give a 3D vertex; Three consecutive vertices give a triangle.
 // A cube has 6 faces with 2 triangles each, so this makes 6*2=12 triangles, and 12*3 vertices
 static const GLfloat g_vertex_buffer_data[] = { 
@@ -112,6 +112,8 @@ void setGLFWWindowHints();
 bool createGLFWWindow(GLFWwindow** window, int width, int height);
 bool initializeGLEW();
 void setupOpenGLRendering();
+void getWidthandHeight(cv::Mat image, int* width, int* height);
+// render object 
 void render(GLuint programID, GLuint MatrixID, glm::mat4 MVP, GLuint vertexbuffer, GLuint colorbuffer);
 glm::mat4 getMVP();
 glm::mat4 getMVPMatrix(const cv::Vec3d& rvec, const cv::Vec3d& tvec, 
@@ -119,8 +121,6 @@ glm::mat4 getMVPMatrix(const cv::Vec3d& rvec, const cv::Vec3d& tvec,
 
 
 int main() {
-
-    float markerLength = 0.05;
     // Set coordinate system
     cv::Mat objPoints(4, 1, CV_32FC3);
     objPoints.ptr<cv::Vec3f>(0)[0] = cv::Vec3f(-markerLength/2.f, markerLength/2.f, 0);
@@ -128,15 +128,22 @@ int main() {
     objPoints.ptr<cv::Vec3f>(0)[2] = cv::Vec3f(markerLength/2.f, -markerLength/2.f, 0);
     objPoints.ptr<cv::Vec3f>(0)[3] = cv::Vec3f(-markerLength/2.f, -markerLength/2.f, 0);
 
-    cv::VideoCapture inputVideo;
-    inputVideo.open(0);
-
-    cv::aruco::DetectorParameters detectorParams = cv::aruco::DetectorParameters();
+	cv::aruco::DetectorParameters detectorParams = cv::aruco::DetectorParameters();
     cv::aruco::Dictionary dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_50);
     cv::aruco::ArucoDetector detector(dictionary, detectorParams);
 
+    cv::VideoCapture inputVideo;
+    inputVideo.open(0);
+	cv::Mat image, imageCopy;
+	
+	int width, height;
+	inputVideo.grab();
+	inputVideo.retrieve(image);
+
+	getWidthandHeight(image, &width, &height);
+
 	// initilize openGL
-    if (!initializeGLFWAndGLEW(&window, 1920, 1080)) {
+    if (!initializeGLFWAndGLEW(&window, width, height)) {
 		return -1;
 	}
 	setupOpenGLRendering();
@@ -168,8 +175,34 @@ int main() {
 	glBufferData(GL_ARRAY_BUFFER, sizeof(g_color_buffer_data), g_color_buffer_data, GL_STATIC_DRAW);
 
 
+
+	GLuint fbo, renderedTexture;
+
+	glGenFramebuffers(1, &fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+	// Create a texture to render to
+	glGenTextures(1, &renderedTexture);
+	glBindTexture(GL_TEXTURE_2D, renderedTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1920, 1080, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+	// Set texture as color attachment
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, renderedTexture, 0);
+
+	GLenum drawBuffers[1] = {GL_COLOR_ATTACHMENT0};
+	glDrawBuffers(1, drawBuffers); // "1" is the size of DrawBuffers
+
+	// Check if FBO is complete
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+		std::cerr << "Error: Framebuffer is not complete!" << std::endl;
+		return -1; // Or handle the error appropriately
+	}
+
+
+
     while (inputVideo.grab()) {
-        cv::Mat image, imageCopy;
         inputVideo.retrieve(image);
         image.copyTo(imageCopy);
         
@@ -189,10 +222,23 @@ int main() {
                 solvePnP(objPoints, corners.at(i), cameraMatrix, distCoeffs, rvecs.at(i), tvecs.at(i));
 				cv::drawFrameAxes(imageCopy, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 0.1);
 				MVP = getMVPMatrix(rvecs[i], tvecs[i], cameraMatrix, 1920, 1080);
+
+				glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 				render(programID, MatrixID, MVP, vertexbuffer, colorbuffer);
+				glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+				// Read the pixels from the texture into an OpenCV Mat
+				cv::Mat renderedImage(1080, 1920, CV_8UC3);
+				glBindTexture(GL_TEXTURE_2D, renderedTexture);
+				glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, renderedImage.data);
+				cv::flip(renderedImage, renderedImage, 0); // Flip the image vertically
+
+				// Overlay the OpenGL rendered image onto the captured frame
+				cv::addWeighted(imageCopy, 1.0, renderedImage, 0.8, 0, imageCopy);
             }
 
         }
+		
         // Show resulting image and close window
         cv::imshow("out", imageCopy);
         char key = (char) cv::waitKey(1);
@@ -222,6 +268,7 @@ void setGLFWWindowHints() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 }
+
 bool createGLFWWindow(GLFWwindow** window, int width, int height) {
     *window = glfwCreateWindow(width, height, "OpenGL Window", nullptr, nullptr);
     if (!*window) {
@@ -243,7 +290,7 @@ bool initializeGLEW() {
 
 void setupOpenGLRendering() {
     // Dark blue background
-	glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
 	glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
@@ -359,11 +406,17 @@ glm::mat4 getMVPMatrix(const cv::Vec3d& rvec, const cv::Vec3d& tvec, const cv::M
     projection[0][2] = 1.0f - 2.0f * cx / width;  // Adjusted for OpenGL's coordinate system
     projection[1][2] = 1.0f - 2.0f * cy / height; // Adjusted for OpenGL's coordinate system
 
+
     // Combine model and projection matrices
     glm::mat4 MVP = projection * model;
 
     return MVP;
 }
 
-
+void getWidthandHeight(cv::Mat image, int* width, int* height) {
+    if (width != nullptr && height != nullptr) {
+        *width = image.cols;
+        *height = image.rows;
+    }
+}
 

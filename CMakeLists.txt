@@ -16,13 +16,14 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 include_directories(${CMAKE_SOURCE_DIR})
 
 # Define your executable
-add_executable(project 
-    main.cpp
+add_executable(main 
+    src/main.cpp
     common/shader.cpp
     common/shader.hpp
+    include/global.hpp
 
 )
 # Link libraries
-target_link_libraries(project ${OpenCV_LIBS} glfw GLEW::GLEW)
+target_link_libraries(main ${OpenCV_LIBS} glfw GLEW::GLEW)
 
 

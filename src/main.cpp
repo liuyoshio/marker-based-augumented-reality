@@ -181,7 +181,7 @@ void setGLFWWindowHints() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	// make glfw window invisiale
-	glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+	// glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 }
 
 bool createGLFWWindow(GLFWwindow** window, int width, int height) {
@@ -214,7 +214,6 @@ void setupOpenGLRendering() {
 	// Ensure we can capture the escape key being pressed below
 	glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
 }
-
 
 void render(GLuint programID, GLuint MatrixID, glm::mat4 MVP, GLuint vertexbuffer, GLuint colorbuffer) {
     		// Clear the screen
@@ -292,13 +291,8 @@ glm::mat4 getMVPMatrix(const cv::Vec3d& rvec, const cv::Vec3d& tvec, const cv::M
 
     // Translation matrix
     glm::mat4 translation = glm::translate(glm::mat4(1.0f), glm::vec3(tvec[0], -tvec[1], -tvec[2]));
+    // glm::mat4 translation = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -20));
     
-    // float offsetX = 1.5f;
-    // float offsetY = 1.0f;
-
-    // translation = glm::translate(translation, glm::vec3(-offsetX, -offsetY, -1.0f));
-    // Model matrix is a combination of scale, rotation, and translation
-
     glm::mat4 model = translation * rotation;
 
     // Projection matrix based on camera intrinsics
@@ -315,6 +309,8 @@ glm::mat4 getMVPMatrix(const cv::Vec3d& rvec, const cv::Vec3d& tvec, const cv::M
     projection[3][2] = -2.0f * farPlane * nearPlane / (farPlane - nearPlane);
     projection[0][2] = 1.0f - 2.0f * cx / width;
     projection[1][2] = 1.0f - 2.0f * cy / height;
+
+    // glm::mat4 projection = glm::perspective(glm::radians(45.0f), 16.0f / 9.0f, 0.1f, 100.0f);
 
     glm::mat4 View       = glm::lookAt(
                             glm::vec3(0,0,0), // Camera is at (4,3,-3), in World Space

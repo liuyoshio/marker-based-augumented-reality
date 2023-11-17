@@ -98,7 +98,7 @@ int main() {
 	// Create a texture to render to
 	glGenTextures(1, &renderedTexture);
 	glBindTexture(GL_TEXTURE_2D, renderedTexture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1920, 1080, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
@@ -133,20 +133,21 @@ int main() {
 
             // Calculate pose for each marker
             for (int i = 0; i < nMarkers; i++) {
-                solvePnP(objPoints, corners.at(i), cameraMatrix, distCoeffs, rvecs.at(i), tvecs.at(i));
-				cv::drawFrameAxes(imageCopy, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 0.1);
-				MVP = getMVPMatrix(rvecs[i], tvecs[i], cameraMatrix, 1920, 1080);
+                cv::solvePnP(objPoints, corners.at(i), cameraMatrix, distCoeffs, rvecs.at(i), tvecs.at(i));
+                std::cout << " " << tvecs[i][0] << " " << tvecs[i][1] << " " << tvecs[i][2] << std::endl;
+				cv::drawFrameAxes(imageCopy, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 6);
+				MVP = getMVPMatrix(rvecs[i], tvecs[i], cameraMatrix, width, height);
 
 				render(programID, MatrixID, MVP, vertexbuffer, colorbuffer);
 
 				// Read the pixels from the texture into an OpenCV Mat
-				cv::Mat renderedImage(1080, 1920, CV_8UC3);
+				cv::Mat renderedImage(height, width, CV_8UC3);
 				glBindTexture(GL_TEXTURE_2D, renderedTexture);
 				glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, renderedImage.data);
 				cv::flip(renderedImage, renderedImage, 0); // Flip the image vertically
 
 				// Overlay the OpenGL rendered image onto the captured frame
-				cv::addWeighted(imageCopy, 1.0, renderedImage, 0.8, 0, imageCopy);
+				cv::addWeighted(imageCopy, 0.8, renderedImage, 1.0, 0, imageCopy);
             }
 
         }
@@ -248,7 +249,7 @@ void render(GLuint programID, GLuint MatrixID, glm::mat4 MVP, GLuint vertexbuffe
 // getMVP return the mat4 MVP
 glm::mat4 getMVP() {
     // Projection matrix : 45� Field of View, 4:3 ratio, display range : 0.1 unit <-> 100 units
-	glm::mat4 Projection = glm::perspective(glm::radians(45.0f), 4.0f / 3.0f, 0.1f, 100.0f);
+	glm::mat4 Projection = glm::perspective(glm::radians(45.0f), 16.0f / 9.0f, 0.1f, 100.0f);
 	// Camera matrix
 	glm::mat4 View       = glm::lookAt(
 								glm::vec3(0,0,-3), // Camera is at (4,3,-3), in World Space
@@ -265,50 +266,64 @@ glm::mat4 getMVP() {
 
 glm::mat4 getMVPMatrix(const cv::Vec3d& rvec, const cv::Vec3d& tvec, const cv::Mat& cameraMatrix, int width, int height) {
     float nearPlane = 0.01f;
-	float farPlane = 100.0f;
-	// Convert rotation vector to rotation matrix
+    float farPlane = 100.0f;
+
+    // Convert rotation vector to rotation matrix
     cv::Mat R;
     cv::Rodrigues(rvec, R);
-    // Convert OpenCV rotation matrix to OpenGL model matrix
-    glm::mat4 model = glm::mat4(1.0f);
-    model[0][0] = static_cast<float>(R.at<double>(0, 0));
-    model[0][1] = static_cast<float>(-R.at<double>(1, 0)); // Invert the y-axis
-    model[0][2] = static_cast<float>(-R.at<double>(2, 0)); // Invert the z-axis
-    model[0][3] = 0.0f;
 
-    model[1][0] = static_cast<float>(R.at<double>(0, 1));
-    model[1][1] = static_cast<float>(-R.at<double>(1, 1)); // Invert the y-axis
-    model[1][2] = static_cast<float>(-R.at<double>(2, 1)); // Invert the z-axis
-    model[1][3] = 0.0f;
+    // Scale matrix
+    // Scale down the box to match the marker size
+    // glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(0.25f)); // Scale down by a factor of 0.25
 
-    model[2][0] = static_cast<float>(R.at<double>(0, 2));
-    model[2][1] = static_cast<float>(-R.at<double>(1, 2)); // Invert the y-axis
-    model[2][2] = static_cast<float>(-R.at<double>(2, 2)); // Invert the z-axis
-    model[2][3] = 0.0f;
+    // Rotation matrix
+    glm::mat4 rotation = glm::mat4(1.0f);
+    rotation[0][0] = static_cast<float>(R.at<double>(0, 0));
+    rotation[0][1] = static_cast<float>(-R.at<double>(1, 0)); // Invert the y-axis
+    rotation[0][2] = static_cast<float>(-R.at<double>(2, 0)); // Invert the z-axis
 
-    model[3][0] = static_cast<float>(tvec[0]*10.0);
-    model[3][1] = static_cast<float>(-tvec[1]*10.0); // Invert the y-axis
-    model[3][2] = static_cast<float>(-tvec[2]*10.0); // Invert the z-axis
-    model[3][3] = 1.0f;
+    rotation[1][0] = static_cast<float>(R.at<double>(0, 1));
+    rotation[1][1] = static_cast<float>(-R.at<double>(1, 1)); // Invert the y-axis
+    rotation[1][2] = static_cast<float>(-R.at<double>(2, 1)); // Invert the z-axis
 
-    // Create projection matrix based on the camera intrinsics
+    rotation[2][0] = static_cast<float>(R.at<double>(0, 2));
+    rotation[2][1] = static_cast<float>(-R.at<double>(1, 2)); // Invert the y-axis
+    rotation[2][2] = static_cast<float>(-R.at<double>(2, 2)); // Invert the z-axis
+
+    // Translation matrix
+    glm::mat4 translation = glm::translate(glm::mat4(1.0f), glm::vec3(tvec[0], -tvec[1], -tvec[2]));
+    
+    // float offsetX = 1.5f;
+    // float offsetY = 1.0f;
+
+    // translation = glm::translate(translation, glm::vec3(-offsetX, -offsetY, -1.0f));
+    // Model matrix is a combination of scale, rotation, and translation
+
+    glm::mat4 model = translation * rotation;
+
+    // Projection matrix based on camera intrinsics
     float fx = static_cast<float>(cameraMatrix.at<double>(0, 0));
     float fy = static_cast<float>(cameraMatrix.at<double>(1, 1));
     float cx = static_cast<float>(cameraMatrix.at<double>(0, 2));
     float cy = static_cast<float>(cameraMatrix.at<double>(1, 2));
 
-    glm::mat4 projection = glm::mat4(1.0f); // Identity matrix
+    glm::mat4 projection = glm::mat4(1.0f);
     projection[0][0] = 2.0f * fx / width;
     projection[1][1] = 2.0f * fy / height;
     projection[2][2] = -(farPlane + nearPlane) / (farPlane - nearPlane);
     projection[2][3] = -1.0f;
     projection[3][2] = -2.0f * farPlane * nearPlane / (farPlane - nearPlane);
-    projection[0][2] = 1.0f - 2.0f * cx / width;  // Adjusted for OpenGL's coordinate system
-    projection[1][2] = 1.0f - 2.0f * cy / height; // Adjusted for OpenGL's coordinate system
+    projection[0][2] = 1.0f - 2.0f * cx / width;
+    projection[1][2] = 1.0f - 2.0f * cy / height;
 
+    glm::mat4 View       = glm::lookAt(
+                            glm::vec3(0,0,0), // Camera is at (4,3,-3), in World Space
+                            glm::vec3(0,0,-1), // and looks at the origin
+                            glm::vec3(0,1,0)  // Head is up (set to 0,-1,0 to look upside-down)
+                        );
 
     // Combine model and projection matrices
-    glm::mat4 MVP = projection * model;
+    glm::mat4 MVP = projection * View * model;
 
     return MVP;
 }
@@ -317,6 +332,7 @@ void getWidthandHeight(cv::Mat image, int* width, int* height) {
     if (width != nullptr && height != nullptr) {
         *width = image.cols;
         *height = image.rows;
+        std::cout << "width: " << *width << " height: " << *height << std::endl;
     }
 }
 

@@ -8,11 +8,12 @@
 
 // Camera intrinsic parameters
 // Initialize camera intrinsic parameters
-const cv::Mat cameraMatrix = (cv::Mat_<double>(3, 3) << 1.66917519e+03, 0.0, 9.58599981e+02,
-                                                0.0, 1.66758795e+03, 6.37204097e+02,
+
+const cv::Mat cameraMatrix = (cv::Mat_<double>(3, 3) << 1.41710453e+03, 0.0, 9.61301170e+02,
+                                                0.0, 1.41815327e+03, 5.74101844e+02,
                                                 0.0, 0.0, 1.0);
-const cv::Mat distCoeffs = (cv::Mat_<double>(1, 5) << -5.84632887e-02, 7.84458638e-01, -9.94221022e-04, -1.60610409e-04, -3.35437898e+00);
-const float markerLength = 0.05;
+const cv::Mat distCoeffs = (cv::Mat_<double>(1, 5) << -6.04647183e-02, 1.03700008e+00, 8.67674098e-03, -1.34208199e-03, -4.02570490e+00);
+const float markerLength = 6;
 
 const GLfloat g_vertex_buffer_data[] = { 
 	-1.0f,-1.0f,-1.0f,

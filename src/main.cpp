@@ -57,7 +57,7 @@ int main() {
 	getWidthandHeight(image, &width, &height);
 
 	// initilize openGL
-    if (!initializeGLFWAndGLEW(&window, width, height)) {
+    if (!initializeGLFWAndGLEW(&window, width/2, height/2)) {
 		return -1;
 	}
 	setupOpenGLRendering();
@@ -117,6 +117,7 @@ int main() {
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
     while (inputVideo.grab()) {
+
         inputVideo.retrieve(image);
         image.copyTo(imageCopy);
         
@@ -134,7 +135,7 @@ int main() {
             // Calculate pose for each marker
             for (int i = 0; i < nMarkers; i++) {
                 cv::solvePnP(objPoints, corners.at(i), cameraMatrix, distCoeffs, rvecs.at(i), tvecs.at(i));
-                std::cout << " " << tvecs[i][0] << " " << tvecs[i][1] << " " << tvecs[i][2] << std::endl;
+                // std::cout << " " << tvecs[i][0] << " " << tvecs[i][1] << " " << tvecs[i][2] << std::endl;
 				cv::drawFrameAxes(imageCopy, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 6);
 				MVP = getMVPMatrix(rvecs[i], tvecs[i], cameraMatrix, width, height);
 
@@ -142,16 +143,13 @@ int main() {
 
 				// Read the pixels from the texture into an OpenCV Mat
 				cv::Mat renderedImage(height, width, CV_8UC3);
-				glBindTexture(GL_TEXTURE_2D, renderedTexture);
 				glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, renderedImage.data);
 				cv::flip(renderedImage, renderedImage, 0); // Flip the image vertically
 
-				// Overlay the OpenGL rendered image onto the captured frame
 				cv::addWeighted(imageCopy, 0.8, renderedImage, 1.0, 0, imageCopy);
             }
 
         }
-		
         // Show resulting image and close window
         cv::imshow("out", imageCopy);
         char key = (char) cv::waitKey(1);
@@ -273,7 +271,7 @@ glm::mat4 getMVPMatrix(const cv::Vec3d& rvec, const cv::Vec3d& tvec, const cv::M
 
     // Scale matrix
     // Scale down the box to match the marker size
-    // glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(0.25f)); // Scale down by a factor of 0.25
+    glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(4.0f)); // Scale down by a factor of 0.25
 
     // Rotation matrix
     glm::mat4 rotation = glm::mat4(1.0f);
@@ -293,7 +291,7 @@ glm::mat4 getMVPMatrix(const cv::Vec3d& rvec, const cv::Vec3d& tvec, const cv::M
     glm::mat4 translation = glm::translate(glm::mat4(1.0f), glm::vec3(tvec[0], -tvec[1], -tvec[2]));
     // glm::mat4 translation = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, -20));
     
-    glm::mat4 model = translation * rotation;
+    glm::mat4 model = translation * rotation * scale;
 
     // Projection matrix based on camera intrinsics
     float fx = static_cast<float>(cameraMatrix.at<double>(0, 0));

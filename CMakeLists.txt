@@ -21,6 +21,7 @@ add_executable(main
     common/shader.cpp
     common/shader.hpp
     include/global.hpp
+    include/OpenGLUtils.hpp
 
 )
 # Link libraries

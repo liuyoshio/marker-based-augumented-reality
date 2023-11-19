@@ -6,10 +6,8 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-// Camera intrinsic parameters
-// Initialize camera intrinsic parameters
-
-std::string vertex_file_path = "../shaders/TransformVertexShader.vertexshader";
+const char* vertex_file_path = "../shaders/TransformVertexShader.vertexshader";
+const char* fragment_file_path = "../shaders/ColorFragmentShader.fragmentshader";
 
 const cv::Mat cameraMatrix = (cv::Mat_<double>(3, 3) << 1.41710453e+03, 0.0, 9.61301170e+02,
                                                 0.0, 1.41815327e+03, 5.74101844e+02,
@@ -94,7 +92,5 @@ const GLfloat g_color_buffer_data[] = {
 		0.820f,  0.883f,  0.371f,
 		0.982f,  0.099f,  0.879f
 	};
-
-
 
 #endif

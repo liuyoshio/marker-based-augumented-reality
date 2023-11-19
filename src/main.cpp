@@ -21,40 +21,36 @@
 GLFWwindow* window;
 
 void getWidthandHeight(cv::Mat image, int* width, int* height);
+glm::mat4 getProjectionMatrix(const cv::Mat& cameraMatrix, int width, int height);
+glm:: mat4 getMVPMatrix(const cv::Vec3d& rvec, const cv::Vec3d& tvec, const glm::mat4& projection);
 
-// glm::mat4 getProjectionMatrix(const cv::Mat& cameraMatrix, int width, int height);
-// glm:: mat4 getMVPMatri
-
-glm::mat4 getMVPMatrix(const cv::Vec3d& rvec, const cv::Vec3d& tvec, 
-                       const cv::Mat& cameraMatrix, int width, int height);
+// glm::mat4 getMVPMatrix(const cv::Vec3d& rvec, const cv::Vec3d& tvec, const cv::Mat& cameraMatrix, int width, int height);
 
 int main() {
-    // Set coordinate system
+    // Setup aruco marker detectoin
     cv::Mat objPoints(4, 1, CV_32FC3);
     objPoints.ptr<cv::Vec3f>(0)[0] = cv::Vec3f(-markerLength/2.f, markerLength/2.f, 0);
     objPoints.ptr<cv::Vec3f>(0)[1] = cv::Vec3f(markerLength/2.f, markerLength/2.f, 0);
     objPoints.ptr<cv::Vec3f>(0)[2] = cv::Vec3f(markerLength/2.f, -markerLength/2.f, 0);
     objPoints.ptr<cv::Vec3f>(0)[3] = cv::Vec3f(-markerLength/2.f, -markerLength/2.f, 0);
-
 	cv::aruco::DetectorParameters detectorParams = cv::aruco::DetectorParameters();
     cv::aruco::Dictionary dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_50);
     cv::aruco::ArucoDetector detector(dictionary, detectorParams);
 
+    // Start video capture
     cv::VideoCapture inputVideo;
     inputVideo.open(0);
 	cv::Mat image, imageCopy;
-	
 	int width, height;
 	inputVideo.grab();
 	inputVideo.retrieve(image);
-
 	getWidthandHeight(image, &width, &height);
 
 	// initilize openGL
     if (!initOpenGL(&window, width/2, height/2)) {
 		return -1;
 	}
-	setOpenGLRendering(window);
+	setupOpenGLRendering(window);
 
     GLuint VertexArrayID;
 	glGenVertexArrays(1, &VertexArrayID);
@@ -62,15 +58,14 @@ int main() {
 
     // Create and compile our GLSL program from the shaders
 	GLuint programID = LoadShaders( 
-		"../shaders/TransformVertexShader.vertexshader", 
-		"../shaders/ColorFragmentShader.fragmentshader" 
+		vertex_file_path, 
+		fragment_file_path
 		);
 
 	// Use our shader
 	glUseProgram(programID);
 	// Get a handle for our "MVP" uniform
 	GLuint MatrixID = glGetUniformLocation(programID, "MVP");
-
     glm::mat4 MVP;
 
     GLuint vertexbuffer;
@@ -84,8 +79,9 @@ int main() {
 	glBufferData(GL_ARRAY_BUFFER, sizeof(g_color_buffer_data), g_color_buffer_data, GL_STATIC_DRAW);
 
 	GLuint fbo, renderedTexture;
-    setFrameBuffer(fbo, renderedTexture, width, height);
+    setupFrameBuffer(fbo, renderedTexture, width, height);
 
+    glm::mat4 projection = getProjectionMatrix(cameraMatrix, width, height);
 
     while (inputVideo.grab()) {
 
@@ -106,9 +102,9 @@ int main() {
             // Calculate pose for each marker
             for (int i = 0; i < nMarkers; i++) {
                 cv::solvePnP(objPoints, corners.at(i), cameraMatrix, distCoeffs, rvecs.at(i), tvecs.at(i));
-                // std::cout << " " << tvecs[i][0] << " " << tvecs[i][1] << " " << tvecs[i][2] << std::endl;
+
 				cv::drawFrameAxes(imageCopy, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 6);
-				MVP = getMVPMatrix(rvecs[i], tvecs[i], cameraMatrix, width, height);
+				MVP = getMVPMatrix(rvecs[i], tvecs[i], projection);
 
 				renderScene(window, programID, MatrixID, MVP, vertexbuffer, colorbuffer);
 
@@ -129,8 +125,39 @@ int main() {
     }
 }
 
+// getWidthandHeight returns the width and height of an image
+void getWidthandHeight(cv::Mat image, int* width, int* height) {
+    if (width != nullptr && height != nullptr) {
+        *width = image.cols;
+        *height = image.rows;
+        std::cout << "width: " << *width << " height: " << *height << std::endl;
+    }
+}
 
-glm::mat4 getMVPMatrix(const cv::Vec3d& rvec, const cv::Vec3d& tvec, const cv::Mat& cameraMatrix, int width, int height) {
+// getProjectionMatrix returns the projection matrix obtained from [cametraMatrix, window size]
+glm::mat4 getProjectionMatrix(const cv::Mat& cameraMatrix, int width, int height) {
+    float nearPlane = 0.01f;
+    float farPlane = 100.0f;
+    // Projection matrix based on camera intrinsics
+    float fx = static_cast<float>(cameraMatrix.at<double>(0, 0));
+    float fy = static_cast<float>(cameraMatrix.at<double>(1, 1));
+    float cx = static_cast<float>(cameraMatrix.at<double>(0, 2));
+    float cy = static_cast<float>(cameraMatrix.at<double>(1, 2));
+
+    glm::mat4 projection = glm::mat4(1.0f);
+    projection[0][0] = 2.0f * fx / width;
+    projection[1][1] = 2.0f * fy / height;
+    projection[2][2] = -(farPlane + nearPlane) / (farPlane - nearPlane);
+    projection[2][3] = -1.0f;
+    projection[3][2] = -2.0f * farPlane * nearPlane / (farPlane - nearPlane);
+    projection[0][2] = 1.0f - 2.0f * cx / width;
+    projection[1][2] = 1.0f - 2.0f * cy / height;
+    
+    return projection;
+}
+
+// getMVP matrix returns the MVP matrix obtained from RT matrix from solvePnP() & projection matrix
+glm::mat4 getMVPMatrix(const cv::Vec3d& rvec, const cv::Vec3d& tvec, const glm::mat4& projection) {
     float nearPlane = 0.01f;
     float farPlane = 100.0f;
 
@@ -162,32 +189,8 @@ glm::mat4 getMVPMatrix(const cv::Vec3d& rvec, const cv::Vec3d& tvec, const cv::M
     
     glm::mat4 model = translation * rotation * scale;
 
-    // Projection matrix based on camera intrinsics
-    float fx = static_cast<float>(cameraMatrix.at<double>(0, 0));
-    float fy = static_cast<float>(cameraMatrix.at<double>(1, 1));
-    float cx = static_cast<float>(cameraMatrix.at<double>(0, 2));
-    float cy = static_cast<float>(cameraMatrix.at<double>(1, 2));
-
-    glm::mat4 projection = glm::mat4(1.0f);
-    projection[0][0] = 2.0f * fx / width;
-    projection[1][1] = 2.0f * fy / height;
-    projection[2][2] = -(farPlane + nearPlane) / (farPlane - nearPlane);
-    projection[2][3] = -1.0f;
-    projection[3][2] = -2.0f * farPlane * nearPlane / (farPlane - nearPlane);
-    projection[0][2] = 1.0f - 2.0f * cx / width;
-    projection[1][2] = 1.0f - 2.0f * cy / height;
-
     // Combine model and projection matrices
     glm::mat4 MVP = projection * model;
 
     return MVP;
 }
-
-void getWidthandHeight(cv::Mat image, int* width, int* height) {
-    if (width != nullptr && height != nullptr) {
-        *width = image.cols;
-        *height = image.rows;
-        std::cout << "width: " << *width << " height: " << *height << std::endl;
-    }
-}
-

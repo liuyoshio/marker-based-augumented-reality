@@ -2,7 +2,7 @@
 
 bool initOpenGL(GLFWwindow** window, int width, int height) {
     if (!initGLFW()) return false;
-    setGLFWWindowHints();
+    setupGLFWWindowHints();
     if (!createGLFWWindow(window, width, height)) return false;
     if (!initGLEW()) return false;
     return true;
@@ -25,7 +25,7 @@ bool initGLEW() {
     return true;
 }
 
-void setGLFWWindowHints() {
+void setupGLFWWindowHints() {
     glfwWindowHint(GLFW_SAMPLES, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -46,7 +46,7 @@ bool createGLFWWindow(GLFWwindow** window, int width, int height) {
     return true;
 }
 
-void setOpenGLRendering(GLFWwindow* window) {
+void setupOpenGLRendering(GLFWwindow* window) {
     // Dark blue background
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
@@ -57,7 +57,7 @@ void setOpenGLRendering(GLFWwindow* window) {
 	glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
 }
 
-bool setFrameBuffer(GLuint &fbo, GLuint &renderedTexture, int width, int height) {
+bool setupFrameBuffer(GLuint &fbo, GLuint &renderedTexture, int width, int height) {
     // Generate and bind the Framebuffer
     glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);

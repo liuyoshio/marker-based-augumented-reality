@@ -9,6 +9,8 @@
 // Camera intrinsic parameters
 // Initialize camera intrinsic parameters
 
+std::string vertex_file_path = "../shaders/TransformVertexShader.vertexshader";
+
 const cv::Mat cameraMatrix = (cv::Mat_<double>(3, 3) << 1.41710453e+03, 0.0, 9.61301170e+02,
                                                 0.0, 1.41815327e+03, 5.74101844e+02,
                                                 0.0, 0.0, 1.0);

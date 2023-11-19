@@ -14,15 +14,19 @@ find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 # Add the project root directory to the include paths
 include_directories(${CMAKE_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # Define your executable
 add_executable(main 
     src/main.cpp
-    common/shader.cpp
-    common/shader.hpp
+
     include/global.hpp
     include/OpenGLUtils.hpp
 
+    src/OpenGLUtils.cpp
+
+    common/shader.cpp
+    common/shader.hpp
 )
 # Link libraries
 target_link_libraries(main ${OpenCV_LIBS} glfw GLEW::GLEW)
